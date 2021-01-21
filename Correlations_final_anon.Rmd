@@ -1,0 +1,152 @@
+---
+title: "Correlations_final_anon"
+author: "Sebastian Wøhlk"
+date: "22/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+#load libraries
+library(readxl)
+library(tidyverse)
+library(phyloseq)
+```
+
+Load metabolite data
+```{r}
+metabolite_data <- read_excel("~/R/Rdata/GC_targeted_KEGGID.xlsx")
+```
+
+Load OTU bacteria data
+```{r}
+load("phyloseq_anon.Rdata")
+```
+
+Turn into relative abundance and filter data
+```{r}
+Xra <- transform_sample_counts(phyloseq_object_all,function(x) x / sum(x) )
+xsub <- filter_taxa(Xra, function(x) sum(x > 0)>100, TRUE)
+```
+
+Define an OTU table as a matrix named Xotu
+```{r}
+Xotu <- otu_table(xsub) %>% t %>% as.matrix()
+OTU_descrp <- data.frame(ra = apply(Xotu,2,sum), otu = colnames(Xotu))
+```
+
+Join tables to get SampleID 
+```{r}
+metabo <- metabolite_data %>% left_join(metaD[,c("ID_chief","SampleID")], by = c('#SampleID' = 'ID_chief'))
+```
+
+Merge "Xotu" and the column names from "metabo" 
+```{r}
+XX <- merge(Xotu, metabo[,colnames(metabo)], by.x = 'row.names',by.y = 'SampleID') %>% 
+  remove_rownames %>% 
+  column_to_rownames(var="Row.names")
+```
+
+Define "n" as the sum of complete cases in "XX"
+```{r}
+n <- sum(complete.cases(XX))
+```
+
+Define "icvar" as a logical expression  
+```{r}
+icvar <- !(colnames(XX) %in% c('#SampleID.y','#SampleID'))
+```
+
+Raw correlation call
+Only metabolites and zOTUs with database annotated relationships are correlated
+```{r}
+cr <- cor(XX[complete.cases(XX),icvar], method = 'spearman',use = 'complete.obs')
+```
+
+Logic argument for whether colnames(cr) refer to a zOTU
+```{r}
+is_mb <- grepl('zOTU_',colnames(cr))
+```
+
+Fitting the correlation call in a data frame where "is_mb" defines whether a certain observation should be a row or column
+Rownames are defined as metabolite
+otu, metabolite and their cr are kept as cr2
+```{r}
+cr2 <- cr[!is_mb,is_mb]%>%
+  as.data.frame() 
+cr2$metabolite <- rownames(cr2)
+cr2 <- cr2 %>%
+  gather(otu, cr,-metabolite) 
+```
+
+#### Load the bioinformatics inferred results
+
+```{r message=FALSE}
+load('Inferred_zOTU_to_compound_relation.RData')
+genome_contribution3 <- genome_contribution2 %>% 
+  mutate(metabolite = compound %>% substr(5,11)) %>% 
+  group_by(metabolite, sample_id) %>% 
+  dplyr::summarise(nlinks = n())
+
+```
+
+Define comparison
+```{r}
+comparison <- cr2 %>% 
+  left_join(genome_contribution3, by = c('metabolite','otu' = 'sample_id')) %>% 
+  left_join(OTU_descrp, by = 'otu') %>% 
+  ungroup %>% 
+  filter(!str_detect(metabolite,'_total')) %>% 
+  mutate(nlinks = ifelse(is.na(nlinks),0,nlinks))
+  
+```
+
+Below I am trying to compare the number of database links to the observed correlation call
+```{r message=FALSE}
+comparison %>% 
+  ggplot(data = ., aes(factor(nlinks),cr)) + 
+  geom_jitter() + 
+  geom_boxplot()
+
+
+comparison %>%
+  mutate(fac = ra %>% log %>% round) %>% 
+  ggplot(data = ., aes(nlinks,cr)) + 
+  stat_smooth() + 
+  geom_point() + 
+  facet_wrap(~fac, scales = 'free')
+
+
+comparison <- comparison %>%
+  mutate(fac = ra %>% log %>% round) 
+```
+
+As links promote both positive as well as negative correlations, we can simply look at the absolute value of those.  
+```{r}
+comparison %>% 
+  ggplot(data = ., aes(factor(nlinks),abs(cr))) + 
+  geom_jitter() + 
+  geom_boxplot()
+```
+
+Or split according to whether it's a negative or positive correlation. 
+```{r}
+comparison %>% 
+  mutate(signr = sign(cr)) %>% 
+  ggplot(data = ., aes(factor(nlinks),cr)) + 
+  geom_jitter() + 
+  geom_boxplot() + 
+  facet_wrap(~signr, ncol = 1, scales = 'free')
+```
+
+```{r message=FALSE}
+comparison %>% 
+  mutate(signr = sign(cr)) %>% 
+  ggplot(data = ., aes(nlinks,cr)) + 
+  geom_point() + 
+  stat_smooth() + 
+  facet_wrap(~signr, ncol = 1, scales = 'free')
+```
