@@ -6,6 +6,8 @@ Additionally, I have uploaded a flowchart explaining the pipeline as well as an 
 
 [Pipeline and Correlations as HTML files for your viewing pleasure](https://sebastianwohlk.github.io/BSc/)
 
+![Flowchart of pipeline](https://user-images.githubusercontent.com/77670585/105363794-b7e42300-5bfc-11eb-964c-bf4f14849dc0.jpg)
+
 ### Walkthrough of the pipeline
 
 For the script **Pipeline_final_anon.Rmd** you will need a phyloseq and a FASTA input.
