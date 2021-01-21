@@ -1,0 +1,270 @@
+---
+title: "Pipeline_final_anon"
+author: "Sebastian Wøhlk"
+date: "22/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+````{r include=FALSE}
+#Load libraries
+library(MASS)
+library(readr)
+library(KEGGREST)
+library(tidyverse)
+library(phylotools)
+library(phyloseq)
+library(kableExtra)
+```
+
+## PIPHILLIN INPUT:
+
+
+#### DIAGONAL MATRIX MAKER
+
+Read data file
+```{r}
+load("phyloseq_anon.Rdata")
+```
+
+
+Filter data for apperance in >25% of samples and more than 5000 counts 
+```{r}
+xsub <- filter_taxa(phyloseq_object_all, function(x) sum(x > 0)>50, TRUE)
+
+xsub <- filter_taxa(xsub, function(x)sum(x)>5000, TRUE)
+```
+
+Make OTU table from filtered data and define row sums and names
+```{r}
+otutb <- data.frame(otu_table(xsub))
+
+diagval <- rowSums(otutb)
+otunr <- rownames(otutb)
+```
+
+Make diagonal matrix with n=nzOTU
+```{r}
+n <- length(otunr)
+df <- diagval %>% diag %>% data.frame()
+colnames(df) <- paste('sample',1:n,sep = '_')
+rownames(df) <- otunr
+write_csv(data.frame(OTU = rownames(df),df), file = 'diagonal_matrix.csv', append = FALSE)
+```
+
+
+#### FASTA Formatting
+Read FASTA file
+
+```{r}
+zOTUs <- read.fasta("~/R/Rdata/zOTUs.txt")
+```
+
+Make reference table
+```{r}
+ref <- data.frame(name=otunr, group="zOTUs")
+```
+
+Split file by reference table
+```{r message=FALSE}
+split_dat(zOTUs,ref_table = ref)
+```
+
+#### zOTUs.fasta will be located in WD
+
+
+### Now data must be manually uploaded to Piphillin.secondgenome.com
+### Results from the Piphillin server must be downloaded manually from e-mail
+### These results should be loaded into R as shown below
+
+
+## PIPHILLIN OUTPUT
+
+Load Piphillin output
+```{r}
+load("C:/Users/seb25/Desktop/Uni/_Bachelorprojekt/Data/Piphillin results/11jan run/20210111120108__seb_keggPiphillin/ko_genome_contribution_table.RData")
+```
+
+Feature - Reaction Link
+```{r}
+rkolink <- keggLink("reaction", "ko")
+rkolinkgo <- data.frame(reaction=rkolink,knum=names(rkolink))
+
+rkolinkgo$goknum <- gsub("ko:K", "K", rkolinkgo$knum)
+```
+
+Reaction - Compound Link
+```{r}
+rclink <-(keggLink("reaction", "compound"))
+rclinkgo <- data.frame(reaction=rclink,compound=names(rclink))
+```
+
+Change sample_id to zOTU
+```{r}
+genome_contribution$sample_id<-gsub("sample","zOTU", genome_contribution$sample_id)
+```
+
+Merge Genome Contribution with real feature counts, rc-link and rko-link.
+Also, remove extra k-number from table join
+```{r}
+realfeat<- data.frame(sample_id=rownames(otutb), tot_count=rowSums(otutb))
+genome_contribution2 <- genome_contribution %>% 
+  left_join(realfeat, by = "sample_id") %>% 
+  mutate(realfeature_count = feature_counts / tot_count) %>% 
+  full_join(rkolinkgo, by = c("feature" = "goknum")) %>% 
+  full_join(rclinkgo, by = "reaction") %>%
+  filter(!is.na(feature))%>%
+  filter(!is.na(reaction))%>%
+  filter(!is.na(sample_id)) %>%
+  dplyr::select(-knum)
+```
+
+Save it for contrasting with observed correlations
+```{r}
+save(file = 'Inferred_zOTU_to_compound_relation.RData', list = c('genome_contribution2'))
+```
+
+#### List of number of infered genomes 
+
+I have a total of 278 zOTUs:
+```{r}
+table(genome_contribution$sample_id) %>% length
+```
+
+These refer to 59 unique genomes. I.e. there are several different OTUs matching one genome. This is obviously a limitation, as the zOTUs - although similar - are not identical. Optimally, each zOTU should match a unique genome:
+```{r}
+table(genome_contribution$genome) %>% length
+```
+
+#### Common/universal genomes
+
+This table above shows that bhan genome is representing 42 different zOTUs, whereas the ones towards the bottom of the list are more uniquely mapped. 
+Genomes bth, btho, bvs, csh, scf & scp each represent 1 zOTU that could be considered a "marker zOTU" for their corresponding genome.
+```{r message=FALSE}
+scroll_box(
+  genome_contribution %>% 
+  group_by(genome) %>% 
+  dplyr::summarise(n_zotus = sample_id %>% unique() %>% length) %>% 
+  arrange(desc(n_zotus)) %>% 
+  kable %>%
+  kable_styling(),
+  height = "300px",
+  width = "100%",
+  fixed_thead = list(enabled=T, background = "lightgrey"))
+```
+
+#### Descriptive statistics
+
+List for each compound of how many genomes (or zOTU) it is present in. 
+```{r message=FALSE}
+tb_compound <- genome_contribution2 %>% 
+  group_by(compound) %>% 
+  dplyr::summarise(n_genome = genome %>% unique %>% length, 
+                   n_zOTU = sample_id %>% unique %>% length)
+
+g0 <- tb_compound %>% 
+  gather(type,nn,n_genome,n_zOTU) %>% 
+  ggplot(data = ., aes(nn)) + 
+  geom_histogram(binwidth = 1) + 
+  facet_wrap(~type, scales = 'free')
+g0
+
+g1 <- tb_compound %>% 
+  gather(type,nn,n_genome,n_zOTU) %>% 
+  ggplot(data = ., aes(compound, nn)) + 
+  geom_bar(stat = 'identity') + 
+  facet_grid(type~.)
+g1
+```
+
+What is seen here is that a fair part of the compounds are either unique for the genome (I.e. appearing in just one genome), or universal (I.e. appearing in all). The universal ones are water, ATP and 312 other compounds - correlation analysis on these is not interesting. 
+However, everything in the middle on these graphs are compounds which appear in some, but not all, of the genomes / zOTUs and hence here we would expect to see correlations. 
+
+#### Lists of unique and universal compounds
+
+Here, I subset tb_compound by n_zOTU = 1 and loop the KEGGFind API in order to add a column with the compound names 
+```{r}
+uniquec <- subset(tb_compound, n_zOTU==1)
+luqc <- nrow(uniquec)
+for (i in 1:luqc){
+  uniquec[i,4]<-keggFind("compound", uniquec[i,1])
+}
+```
+
+Aferwards, I join the compound id with genome_contribution2 in order to be able to see, which genome and zOTU is linked to the compound.
+Lastly, I change the column name from ...4 to compound_name and remove the columns n_genome and n_zOTU because of redundancy
+```{r}
+uniquec2 <- uniquec %>% 
+  left_join(genome_contribution2[,c("genome", "sample_id", "compound")], by="compound") %>%
+  rename(
+    compound_name = ...4
+  )
+uniquec2 <- subset(uniquec2, select = -c(n_genome, n_zOTU))
+```
+
+Here made into a list
+```{r}
+scroll_box(
+  uniquec2 %>%
+    kable %>%
+    kable_styling(),
+  height = "300px",
+  width = "100%",
+  fixed_thead = list(enabled=T, background = "lightgrey"))
+```
+
+Here, I subset tb_compound by n_genome = 1 and loop the KEGGFind API in order to add a column with the compound names 
+```{r}
+uniquecgen <- subset(tb_compound, n_genome==1)
+luqcgen <- nrow(uniquecgen)
+for (i in 1:luqcgen){
+  uniquecgen[i,4]<-keggFind("compound", uniquecgen[i,1])
+}
+```
+
+Afterwards, I join the compound id with genome_contribution2 in order to be able to see, which genome is linked to the compound.
+Lastly, I change the column name from ...4 to compound_name and remove the column n_genome as it is redundant
+```{r}
+uniquecgen2 <- uniquecgen %>% 
+  left_join(genome_contribution2[,c("genome", "compound")], by="compound")
+uniquecgen2 <- subset((unique(uniquecgen2)), select = -n_genome) %>%
+  rename(
+    compound_name = ...4
+  ) 
+```
+
+Unique compounds for genomes made into a list
+```{r}
+scroll_box(
+  uniquecgen2 %>%
+    kable %>%
+    kable_styling(),
+  height = "300px",
+  width = "100%",
+  fixed_thead = list(enabled=T, background = "lightgrey"))
+```
+
+List of universal compounds that can be found in every zOTU
+```{r}
+universalc <- subset(tb_compound, n_zOTU==278)
+universalc <- universalc[-314,] #removing row NA
+luvc <- nrow(universalc)
+for (i in 1:luvc){
+  universalc[i,4]<-keggFind("compound", universalc[i,1])
+}
+```
+
+Universal compounds made into a list and column ...4 renamed to compound_name
+```{r}
+scroll_box(
+  universalc %>% 
+    rename(compound_name = ...4) %>%
+    kable %>%
+    kable_styling(),
+  height = "300px",
+  width = "100%",
+  fixed_thead = list(enabled=T, background = "lightgrey"))
+```
