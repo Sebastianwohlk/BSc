@@ -3,8 +3,7 @@ This repository serves as appendices for my bachelor's thesis.
 
 Here, you will be able to find my pipeline and validation thereof in html and rmd formats.
 Additionally, I have uploaded a flowchart explaining the pipeline as well as an example dataset.
-[Pipeline HTML version](https://sebastianwohlk.github.io/BSc/Pipeline_final_anon.html)
-[Validation HTML version]
+[Pipeline and Correlations as HTML files for your viewing pleasure](https://sebastianwohlk.github.io/BSc/)
 
 ### Walkthrough of the pipeline
 
