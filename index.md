@@ -8,4 +8,4 @@ Additionally, I've carried out zOTU-compound correlations based on KEGG database
 [Correlations](Correlations_final_anon.html)
 
 ### Repository
-Here's a link to the [repository](/Sebastianwohlk/BSc/tree/gh-pages), where you'll be able to find a flowchart of the pipeline, example data and a walkthrough
+Here's a link to the [repository](), where you'll be able to find a flowchart of the pipeline, example data and a walkthrough
