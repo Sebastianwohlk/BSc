@@ -23,7 +23,8 @@ Through the KEGGLink API, genome contribution is filtered by biological relevanc
 A new file is saved to your working directory - *Inferred_zOTU_to_compound_relation.RData*.
 This file will be used for validation through correlations.
 
-The rest of the pipeline contains some descriptive statistics of your results. 
+The rest of the pipeline contains some descriptive statistics of your results.
+
 An example of this can be found in [the HTML version of the pipeline](https://sebastianwohlk.github.io/BSc/Pipeline_final_anon.html).
 
 ### Walkthrough of the validation
@@ -37,4 +38,5 @@ If following the example given here - use *Inferred_zOTU_to_compound_relation.RD
 
 The pairwise correlation coefficients between metabolites and compounds are correlated again.
 This time to the amount of KEGG database links.
+
 An example of this can be found in [the HTML version of the validation](https://sebastianwohlk.github.io/BSc/Correlations_final_anon.html).
