@@ -11,7 +11,7 @@ Additionally, I have uploaded a flowchart explaining the pipeline as well as an 
 ### Walkthrough of the pipeline
 
 For the script **Pipeline_final_anon.Rmd** you will need a phyloseq and a FASTA input.
-If follwing the example given here - use *phyloseq_anon.RData* and *zOTUs.txt*.
+If following the example given here - use *phyloseq_anon.RData* and *zOTUs.txt*.
 
 This will provide you with the outputs *diagonal_matrix.csv* and *zOTUs.fasta*.
 Both will be located in your working directory.
